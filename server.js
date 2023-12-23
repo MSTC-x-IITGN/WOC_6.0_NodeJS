@@ -197,7 +197,7 @@ const resetRoundData = (roomId) => {
   rooms[roomId].scoreThisMatch = [];
   rooms[roomId].matchInProgress = false;
   rooms[roomId].currentWord = null;
-  rooms[roomId].remainingRounds = 1;
+  rooms[roomId].remainingRounds = rooms[roomId].maxRounds;
   rooms[roomId].currentWord = null;
   rooms[roomId].score = [];
 }
@@ -218,8 +218,9 @@ io.on('connection', (socket) => {
         host: socket,
         drawer: null,
         nextDrawerIndex: 0,
-        remainingRounds: 1,
-        timeForGuess: 10,
+        maxRounds: 3, // change if needed more round
+        remainingRounds: 3,
+        timeForGuess: 60, // change if needed more guess time
         timeRemaining: 0,
         currentWord: null,
         gameStarted: false,
