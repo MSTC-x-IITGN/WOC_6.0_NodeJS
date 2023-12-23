@@ -35,6 +35,7 @@ document.getElementById('joinRoomBtn').addEventListener('click', () => {
   }
 });
 
+// event for showing game page and canvas setup
 socket.on("goToGamePage", (username, roomId) => {
   document.getElementById("indexPage").style.display = "none";
   document.getElementById("gamePage").style.display = "flex";
@@ -43,6 +44,7 @@ socket.on("goToGamePage", (username, roomId) => {
   canvasSetup();
 });
 
+// event for adding user in this client
 socket.on("addUser", (username, clientId) => {
   addUserItem(username, clientId);
   users[clientId] = {
@@ -51,6 +53,7 @@ socket.on("addUser", (username, clientId) => {
   }; 
 });
 
+// event for remove user from this client
 socket.on("removeUser", (clientId) => {
   removeUserItem(clientId);
   delete users[clientId];
@@ -78,15 +81,19 @@ socket.on("userKickedMessage", (username) => {
   addInfoChat(`${username} is kicked off by Host`, "red");
 });
 
+
+// event for disconnecting from server
 socket.on("forceDisconnect", () => {
   location.reload();
 });
 
+// copy roomId whenever roomBtn clicked
 document.getElementsByClassName('roomIdBtn')[0].addEventListener('click', () => {
   const text = document.getElementById('roomIdBtn').innerText;
   navigator.clipboard.writeText(text);
 });
 
+// handle chat message here
 document.getElementById("msgInput").addEventListener("submit", (e) => {
   e.preventDefault();
   if(msg.value !== ''){
@@ -161,6 +168,7 @@ socket.on("matchStart", (time) => {
   startCountDown("timer", time);
 });
 
+// event for match is over
 socket.on("matchOver", (word) => {
   if(timer !== null){
     clearInterval(timer);
@@ -169,14 +177,18 @@ socket.on("matchOver", (word) => {
   showMatchOver(word);
 });
 
+// event for showing results
 socket.on("endOfRoundSummary", (results) => {
   appendResults(results);
 })
 
+// event for ending entire game
 socket.on("endGame", () => {
   showFinalResult();
 });
 
+
+// below to events are for adding chats in chat section
 socket.on("normalChat", (chat) => {
   addNormalChat(chat.sender, chat.message);
 });
@@ -185,12 +197,13 @@ socket.on("infoChat", (msg, color) => {
   addInfoChat(msg, color);
 });
 
+// envent for guessers if they guessed correctly
 socket.on("revealWord", (word) => {
   document.getElementById("guessWord").innerText = word;
 });
 
 
-
+// full canvas setup 
 const canvasSetup = () => {
   canvas.width = canvas.offsetWidth;
   canvas.height = canvas.offsetHeight;
@@ -211,7 +224,6 @@ const canvasSetup = () => {
     socket.emit("clearRoomCanvas");
   });
 }
-
 
 let isDrawing = false;
 
@@ -259,6 +271,7 @@ const mouseOutEventListener = () => {
   });
 };
 
+// This user can draw (drawer)
 socket.on("canDraw", () => {
   canvas.addEventListener('mousedown', mouseDownEventListener);
   canvas.addEventListener('mouseup', mouseUpEventListener);
@@ -266,6 +279,7 @@ socket.on("canDraw", () => {
   canvas.addEventListener('mouseout', mouseOutEventListener);
 });
 
+// This is user can't draw on canvas
 socket.on("canNotDraw", () => {
   canvas.removeEventListener('mousedown', mouseDownEventListener);
   canvas.removeEventListener('mouseup', mouseUpEventListener);
@@ -288,6 +302,7 @@ const draw = (x, y) => {
   });
 }
   
+// for receiving canvasData from drawer via server
 socket.on("canvasData", (data) => {
   ctx.strokeStyle = data.strokeStyle;
   ctx.lineWidth = data.lineWidth;
@@ -300,6 +315,7 @@ socket.on("canvasData", (data) => {
     ctx.closePath();
   }
 });
+
 
 socket.on("clearCanvasData", () => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
