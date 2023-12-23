@@ -28,7 +28,7 @@ body {
   text-align: center;
 }
 
-h1 {
+.formContainer h1 {
   font-family: 'Roboto', sans-serif;
   color: #333;
   font-size: 28px;
@@ -336,12 +336,17 @@ h2 {
   outline: none;
   padding: 1rem;
   flex: 1 1 100%;
+  margin-right: 1rem;
 }
 
 .inputIcon{
   width: 30px;
-  margin-left: 1rem;
   cursor: pointer;
+}
+
+#msgSubmit{
+
+  font-size: large;
 }
 
 .modal{
@@ -350,15 +355,38 @@ h2 {
   background-color: black;
   opacity: 90%;
   color: white;
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   padding: 20% 30%;
   text-align: center;
   line-height: 3em;
-  display: none;
 }
-     
+
+#resultScreen{
+  width: 100vw;
+  height: 100vh;
+  background-color: black;
+  opacity: 90%;
+  color: white;
+  position: fixed;
+  top: 0;
+  left: 0;
+  padding: 10% 20%;
+  text-align: center;
+  line-height: 3em;
+}
+
+.modal h1, #resultScreen h1{
+  font-size: x-large;
+}
+
+#resultList{
+  width: 100%;
+  max-height: 50%;
+  overflow-y: scroll;
+}
+  
 @media screen and (max-width: 600px) {
   .gameContainer{
     flex-direction: column;

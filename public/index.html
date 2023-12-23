@@ -72,7 +72,7 @@
       
       <div class="menu">
 
-        <button class="btn startBtn disabled">Start</button>
+        <button class="btn startBtn disabled" id="startGameBtn">Start</button>
 
         <button class="btn roomIdBtn">Room ID: <span id="roomIdBtn">ABCD</span></button>
 
@@ -86,12 +86,12 @@
       
       <div class="canvasBar">
 
-        <div class="guessWord">
-          Art
+        <div class="guessWord" id="guessWord">
+          Guess Word shown here
         </div>
 
-        <div class="timer">
-          34
+        <div class="timer" id="timer">
+          Count Down Shown Here
         </div>
       </div>
 
@@ -134,20 +134,24 @@
       </div>
 
 
-      <div class="messageInput">
+      <form class="messageInput" id="msgInput">
         <input type="text" id="msg" placeholder="type a message">
-        <img src="images/msgInputIcon.svg" alt="" class="inputIcon">
-      </div>
+
+        <button type="submit" id="msgSubmit"><img src="images/msgInputIcon.svg" alt="" class="inputIcon" id="msgSubmit"></button>
+      </form>
     </div>
 
 
-    <div class="modal">
-      <h1 id="modalMsg1">User1 is Drwaing Or You are Drawing</h1>
-      <h1>Word : <span id="modalWord">Watermelon</span></h1>
-      <h1 id="modalMsg2">You have to guess Or Others have to Guess</h1>
+    <!-- <div id="resultScreen">
+      <h1>Macth Over</h1>
+      <p>Time Out</p>
       <br>
-      <h1 id="ModalCountDown">5</h1>
-    </div>
+      <div id="resultList">
+      </div>
+    </div> -->
+
+    
+    <div id="addModalBefore"></div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>

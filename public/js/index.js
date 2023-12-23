@@ -3,8 +3,16 @@ const socket = io();
 const createUsername = document.getElementById('createUsername');
 const joinUsername = document.getElementById('joinUsername');
 const joinRoomId = document.getElementById('joinRoomId');
+const msg = document.getElementById('msg');
 
 let users = {};
+let isDrawer = false;
+let isHost = false;
+let guessWord = "";
+let guessWordLength = 0;
+let whoIsDrawing = "";
+
+var timer = null;
 
 const canvas = document.getElementById("canvasBoard");
 const ctx = canvas.getContext("2d");
@@ -14,6 +22,7 @@ document.getElementById('createRoomBtn').addEventListener('click', () => {
   if (createUsername.value !== '') {
     socket.emit('createRoom', createUsername.value, (username, roomId) => {
       socket.emit('join', username, roomId);
+      isHost = true;
     });
   }
 });
@@ -38,7 +47,7 @@ socket.on("addUser", (username, clientId) => {
   addUserItem(username, clientId);
   users[clientId] = {
     username: username,
-    points: 0,
+    score: 0,
   }; 
 });
 
@@ -52,13 +61,117 @@ socket.on("userJoinedMessage", (username) => {
 });
 
 socket.on("userLeftMessage", (username) => {
-  addInfoChat(`${username} is left`);
+  addInfoChat(`${username} is left`, "red");
 });
 
 document.getElementsByClassName('roomIdBtn')[0].addEventListener('click', () => {
   const text = document.getElementById('roomIdBtn').innerText;
   navigator.clipboard.writeText(text);
 });
+
+document.getElementById("msgInput").addEventListener("submit", (e) => {
+  e.preventDefault();
+  if(msg.value !== ''){
+    socket.emit("chat", msg.value);
+    msg.value = "";
+  }
+});
+
+// tell server to start game if start button was clicked by host only
+socket.on("enableStartBtn", () => {
+  const startBtn = document.getElementById("startGameBtn");
+  startBtn.classList.remove('disabled');
+  startBtn.addEventListener("click", () => {
+    socket.emit("startGame");
+  });
+});
+
+// get guess word from server if this client is drawer
+socket.on("guessWord", (word) => {
+  guessWord = word;
+  document.getElementById("guessWord").innerText = guessWord;
+  isDrawer = true;
+});
+
+// get guess word length for guessers
+socket.on("guessWordLength", (length) => {
+  guessWordLength = length;
+  document.getElementById("guessWord").innerText = wordsAsBlank(guessWordLength);
+  isDrawer = false;
+});
+
+// get information about drawer
+socket.on("whoIsDrawing", (clientId, username) => {
+  whoIsDrawing = username;
+
+  // change drawer icon of this clientId
+  document.getElementsByClassName(clientId)[1].setAttribute("src", "images/drawIcon.svg");
+
+  // change all other icon to userIcon
+  Object.keys(users).forEach((key) => {
+    if(key !== clientId){
+      document.getElementsByClassName(key)[1].setAttribute("src", "images/userIcon.svg");
+    }
+  });
+
+  // add infoChat about who is drawing
+  addInfoChat(`${username} is drawing`, 'orange');
+});
+
+// alert users that game is about to start in 5 sec
+socket.on("alertUsersGameIsStarting", () => {
+  // remove result screen if available
+  const resultScreen = document.getElementById("resultScreen");
+  if(resultScreen){
+    resultScreen.remove();
+  }
+  if(isDrawer){
+    showGameStartingScreenForDrawer(guessWord);
+  }else{
+    showGameStartingScreenForGuesser(whoIsDrawing);
+  }
+});
+
+// start match event
+socket.on("matchStart", (time) => {
+  const modal = document.getElementsByClassName("modal")[0];
+  if(modal){
+    modal.remove();
+  }
+
+  updateUsersUI();
+  startCountDown("timer", time);
+});
+
+socket.on("matchOver", (word) => {
+  if(timer !== null){
+    clearInterval(timer);
+    timer = null;
+  }
+  showMatchOver(word);
+});
+
+socket.on("endOfRoundSummary", (results) => {
+  appendResults(results);
+})
+
+socket.on("endGame", () => {
+  showFinalResult();
+});
+
+socket.on("normalChat", (chat) => {
+  addNormalChat(chat.sender, chat.message);
+});
+
+socket.on("infoChat", (msg, color) => {
+  addInfoChat(msg, color);
+});
+
+socket.on("revealWord", (word) => {
+  document.getElementById("guessWord").innerText = word;
+});
+
+
 
 const canvasSetup = () => {
   canvas.width = canvas.offsetWidth;
@@ -81,12 +194,10 @@ const canvasSetup = () => {
   });
 }
 
-  
 
 let isDrawing = false;
 
 const mouseDownEventListener = (e) => {
-  console.log(e.clientX, e.clientY);
   isDrawing = true;
   ctx.beginPath();
   ctx.moveTo(e.clientX - canvas.offsetLeft, e.clientY - canvas.offsetTop);
@@ -137,6 +248,13 @@ socket.on("canDraw", () => {
   canvas.addEventListener('mouseout', mouseOutEventListener);
 });
 
+socket.on("canNotDraw", () => {
+  canvas.removeEventListener('mousedown', mouseDownEventListener);
+  canvas.removeEventListener('mouseup', mouseUpEventListener);
+  canvas.removeEventListener('mousemove', mouseMoveEventListener);
+  canvas.removeEventListener('mouseout', mouseOutEventListener);
+})
+
 const draw = (x, y) => {
 
   ctx.lineTo(x, y);
@@ -173,9 +291,9 @@ socket.on("clearCanvasData", () => {
 const addUserItem = (username, clientId) => {
   const userItem = `<div class="userItem ${clientId}">
   <div class="userInfo">
-    <img src="images/userIcon.svg" alt="UserIcon" class="userIcon">
+    <img src="images/userIcon.svg" alt="UserIcon" class="userIcon ${clientId}">
     <span class="userName">${username}</span>
-    <span class="points" id="${clientId}">0</span>
+    <span class="points ${clientId}">0</span>
   </div>
   
     <img src="images/deleteIcon.svg" alt="" class="deleteIcon">
@@ -197,8 +315,8 @@ const addNormalChat = (username, msg) => {
   document.getElementById("addChatBefore").insertAdjacentHTML("beforebegin", normalChat);
 }
 
-const addInfoChat = (msg) => {
-  const infoChat = `<div class="infoChat">
+const addInfoChat = (msg, color="blue") => {
+  const infoChat = `<div class="infoChat" style="color: ${color}">
     <p>
       ${msg}
     </p>
@@ -206,8 +324,133 @@ const addInfoChat = (msg) => {
   document.getElementById("addChatBefore").insertAdjacentHTML("beforebegin", infoChat);
 }
 
-const updatUsersUI = () => {
-  for(const [clientId, {points}] of Object.entries(users)){
-    document.getElementsByClassName(clientId)[1].innerText = points;
+const updateUsersUI = () => {
+  for(const [clientId, {score}] of Object.entries(users)){
+    document.getElementsByClassName(clientId)[2].innerText = score;
+  }
+}
+
+const showGameStartingScreenForDrawer = (word) => {
+  const addModalBefore = document.getElementById("addModalBefore");
+  const modal = `<div class="modal" style="color:white">
+    <h1>You are Drawing</h1>
+    <h1>Word: ${word}</h1>
+    <br>
+    <h1>Others have to Guess</h1>
+    <br>
+    <h1 id="modalCountDown">5</h1>
+  </div>`;
+  addModalBefore.insertAdjacentHTML('beforebegin', modal);
+  startCountDown("modalCountDown", 5);
+}
+
+const showGameStartingScreenForGuesser = (whoIsDrawing) => {
+  const addModalBefore = document.getElementById("addModalBefore");
+  const modal = `<div class="modal" style="color:white">
+    <h1>${whoIsDrawing} is Drwaing</h1>
+    <br>
+    <h1>You have to guess</h1>
+    <br>
+    <h1 id="modalCountDown">5</h1>
+  </div>`
+  addModalBefore.insertAdjacentHTML('beforebegin', modal);
+  startCountDown("modalCountDown", 5);
+} 
+
+const startCountDown = (id, countDown) => {
+  countDown = Number(countDown);
+
+  if(document.getElementById(id)){
+    document.getElementById(id).innerText = countDown;
+  }
+
+  let count = countDown;
+  if(timer !== null){
+    clearInterval(timer);
+    timer = null;
+  }
+
+  timer = setInterval(() => {
+    count--;
+    if(document.getElementById(id)){
+      document.getElementById(id).innerText = count;
+    }else{
+      clearInterval(timer);
+      timer = null;
+    }
+
+    if(count == 0){
+      clearInterval(timer);
+      timer = null;
+    }
+
+  }, 1000);
+
+}
+
+const wordsAsBlank = (length) => {
+  let word = "";
+  if(length > 0){
+    word += '_';
+  }
+  for(let i = 1; i < length; i++){
+    word += " _";
+  }
+
+  return word;
+}
+
+const showMatchOver = (word) => {
+  const addModalBefore = document.getElementById("addModalBefore");
+  const resultScreen = `<div id="resultScreen" style="color:white">
+    <h1>Match Over</h1>
+    <h1>Guess Word : ${word}</h1>
+    <p>Time Out</p>
+    <br>
+    <div id="resultList">
+    </div>
+  </div>`;
+  addModalBefore.insertAdjacentHTML('beforebegin', resultScreen);
+}
+
+const appendResults = (results) => {
+  const resultList = document.getElementById("resultList");
+  if(resultList){
+    results.forEach(({clientId, username, score}) => {
+      users[clientId].score = score;
+      const p = document.createElement("p");
+      p.innerText = `${username} : ${score}`;
+      resultList.appendChild(p);
+    });
+  }
+}
+
+const showFinalResult = () => {
+  let resultScreen = document.getElementById("resultScreen");
+  if(resultScreen){
+    resultScreen.remove();
+  }
+
+  const addModalBefore = document.getElementById("addModalBefore");
+  resultScreen = `<div id="resultScreen">
+    <h1>Game Over - Final LeaderBoard</h1>
+    <br>
+    <div id="resultList">
+    </div>
+    <br>
+    <button id="startNewGame" class="${(isHost) ? '' : 'disabled'}"> Start New Game </button>
+  </div>`;
+
+  addModalBefore.insertAdjacentHTML('beforebegin', resultScreen);
+  document.getElementById("startNewGame").addEventListener('click', () => {
+    socket.emit("startGame");
+  });
+  const resultList = document.getElementById("resultList");
+  if(resultList){
+    Object.keys(users).forEach((clientId) => {
+      const p = document.createElement("p");
+      p.innerText = `${users[clientId].username} : ${users[clientId].score}`;
+      resultList.appendChild(p);
+    });
   }
 }
