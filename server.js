@@ -37,43 +37,72 @@ let rooms = {};
 
 
 const endRound = (socket) => {
-  const results = [];
+  try{
 
-  let totalDrawerScore = 0;
-  rooms[socket.roomId].users.forEach((userSocket) => {
-    if(rooms[socket.roomId].drawer !== userSocket){
-      totalDrawerScore += (rooms[socket.roomId].scoreThisMatch[userSocket.clientId] ?? 0);
-      results.push({
-        clientId: userSocket.clientId,
-        username: userSocket.username,
-        score: rooms[socket.roomId].score[userSocket.clientId] ?? 0,
-      });
+    const results = [];
+
+    let totalDrawerScore = 0;
+    rooms[socket.roomId].users.forEach((userSocket) => {
+      if(rooms[socket.roomId].drawer !== userSocket){
+        totalDrawerScore += (rooms[socket.roomId].scoreThisMatch[userSocket.clientId] ?? 0);
+        results.push({
+          clientId: userSocket.clientId,
+          username: userSocket.username,
+          score: rooms[socket.roomId].score[userSocket.clientId] ?? 0,
+        });
+      }
+    });
+
+
+    if(rooms[socket.roomId].score[rooms[socket.roomId].drawer.clientId]){
+      rooms[socket.roomId].score[rooms[socket.roomId].drawer.clientId] += Math.floor(totalDrawerScore / 4);
+    }else{
+      rooms[socket.roomId].score[rooms[socket.roomId].drawer.clientId] = Math.floor(totalDrawerScore / 4);
     }
-  });
+    
 
-  if(rooms[socket.roomId].score[rooms[socket.roomId].drawer.clientId]){
-    rooms[socket.roomId].score[rooms[socket.roomId].drawer.clientId] += Math.floor(totalDrawerScore / 4);
-  }else{
-    rooms[socket.roomId].score[rooms[socket.roomId].drawer.clientId] = Math.floor(totalDrawerScore / 4);
+    results.push({
+      clientId: rooms[socket.roomId].drawer.clientId,
+      username: rooms[socket.roomId].drawer.username,
+      score: rooms[socket.roomId].score[rooms[socket.roomId].drawer.clientId] ?? 0,
+    });
+
+    io.in(socket.roomId).emit("endOfRoundSummary", results);
+    resetMatchData(socket.roomId);
+
+    rooms[socket.roomId].intermissionTimer = setTimeout(() => {
+
+      clearTimeout(rooms[socket.roomId].intermissionTimer);
+
+      io.in(socket.roomId).emit("matchStartCountDown");
+
+      rooms[socket.roomId].nextDrawerIndex++;
+
+      if(rooms[socket.roomId].nextDrawerIndex >= rooms[socket.roomId].users.length){
+        // one round ends
+
+        rooms[socket.roomId].remainingRounds--;
+
+        if(rooms[socket.roomId].remainingRounds <= 0){
+          endGame(socket.roomId);
+        }
+        rooms[socket.roomId].nextDrawerIndex = 0;
+      }
+
+      startRound(socket);
+    }, 5000);
+
+  }catch(e){
+    console.log(e);
   }
+}
+
+const startRound = (socket) => {
+  try{
   
-
-  results.push({
-    clientId: rooms[socket.roomId].drawer.clientId,
-    username: rooms[socket.roomId].drawer.username,
-    score: rooms[socket.roomId].score[rooms[socket.roomId].drawer.clientId] ?? 0,
-  });
-
-  io.in(socket.roomId).emit("endOfRoundSummary", results);
-  resetMatchData(socket.roomId);
-
-  rooms[socket.roomId].intermissionTimer = setTimeout(() => {
-
-    clearTimeout(rooms[socket.roomId].intermissionTimer);
-
-    io.in(socket.roomId).emit("matchStartCountDown");
-
-    rooms[socket.roomId].nextDrawerIndex++;
+    if(rooms[socket.roomId].remainingRounds <= 0){
+      return;
+    }
 
     if(rooms[socket.roomId].nextDrawerIndex >= rooms[socket.roomId].users.length){
       // one round ends
@@ -86,52 +115,46 @@ const endRound = (socket) => {
       rooms[socket.roomId].nextDrawerIndex = 0;
     }
 
-    startRound(socket);
-  }, 5000);
-}
+    rooms[socket.roomId].drawer = rooms[socket.roomId].users[rooms[socket.roomId].nextDrawerIndex];
 
-const startRound = (socket) => {
-  if(rooms[socket.roomId].remainingRounds <= 0){
-    return;
+    rooms[socket.roomId].currentWord = generateRandomWord();
+
+    // send word to drawer
+    rooms[socket.roomId].drawer.emit("guessWord", rooms[socket.roomId].currentWord);
+
+    // send client id of drawer to all 
+    io.in(socket.roomId).emit("whoIsDrawing", rooms[socket.roomId].drawer.clientId, rooms[socket.roomId].drawer.username);
+
+    // send guessWord Length to all except drawer
+    rooms[socket.roomId].drawer.to(socket.roomId).emit("guessWordLength", rooms[socket.roomId].currentWord.length);
+
+    rooms[socket.roomId].drawer.emit("canDraw");
+    rooms[socket.roomId].drawer.to(socket.roomId).emit("canNotDraw");
+
+    io.in(socket.roomId).emit("alertUsersGameIsStarting");
+
+    io.in(socket.roomId).emit("clearCanvasData");
+
+    rooms[socket.roomId].roundStartTimer = setTimeout(() => {
+      clearTimeout(rooms[socket.roomId].roundStartTimer);
+
+      io.in(socket.roomId).emit("matchStart", rooms[socket.roomId].timeForGuess);
+      rooms[socket.roomId].matchInProgress = true;
+
+      rooms[socket.roomId].timer = setInterval(() => {
+        rooms[socket.roomId].timeRemaining--;
+        if(rooms[socket.roomId].timeRemaining < 0){
+          io.in(socket.roomId).emit("matchOver", rooms[socket.roomId].currentWord);
+          endRound(socket);
+          clearInterval(rooms[socket.roomId].timer);
+        }
+
+      }, 1000);
+
+    }, 5000);
+  }catch(e){
+    console.log(e);
   }
-  rooms[socket.roomId].drawer = rooms[socket.roomId].users[rooms[socket.roomId].nextDrawerIndex];
-
-  rooms[socket.roomId].currentWord = generateRandomWord();
-
-  // send word to drawer
-  rooms[socket.roomId].drawer.emit("guessWord", rooms[socket.roomId].currentWord);
-
-  // send client id of drawer to all 
-  io.in(socket.roomId).emit("whoIsDrawing", rooms[socket.roomId].drawer.clientId, rooms[socket.roomId].drawer.username);
-
-  // send guessWord Length to all except drawer
-  rooms[socket.roomId].drawer.to(socket.roomId).emit("guessWordLength", rooms[socket.roomId].currentWord.length);
-
-  rooms[socket.roomId].drawer.emit("canDraw");
-  rooms[socket.roomId].drawer.to(socket.roomId).emit("canNotDraw");
-
-  io.in(socket.roomId).emit("alertUsersGameIsStarting");
-
-  io.in(socket.roomId).emit("clearCanvasData");
-
-  rooms[socket.roomId].roundStartTimer = setTimeout(() => {
-    clearTimeout(rooms[socket.roomId].roundStartTimer);
-
-    io.in(socket.roomId).emit("matchStart", rooms[socket.roomId].timeForGuess);
-    rooms[socket.roomId].matchInProgress = true;
-
-    rooms[socket.roomId].timer = setInterval(() => {
-      rooms[socket.roomId].timeRemaining--;
-      if(rooms[socket.roomId].timeRemaining < 0){
-        io.in(socket.roomId).emit("matchOver", rooms[socket.roomId].currentWord);
-        endRound(socket);
-        clearInterval(rooms[socket.roomId].timer);
-      }
-
-    }, 1000);
-
-  }, 5000);
-
 }
 
 const resetMatchData = (roomId) => {
@@ -161,7 +184,7 @@ const resetRoundData = (roomId) => {
 }
 
 io.on('connection', (socket) => {
-
+  try{
   // creating a client id for other client interactions
   socket.clientId = generateRandomId(20);
   
@@ -306,23 +329,94 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on("kickUser", (clientId) => {
+    if(!rooms.hasOwnProperty(socket.roomId)){
+      return;
+    }
+    // check if host made event or not
+    if(rooms[socket.roomId].host === socket){
+
+      // if host is trying to remove himself
+      if(socket.clientId == clientId){
+        return;
+      }
+      // retrieve socket from clientId
+      rooms[socket.roomId].users.forEach((userSocket) => {
+        if(userSocket.clientId === clientId){
+          io.to(socket.roomId).emit("userKickedMessage", userSocket.username);
+          userSocket.emit("forceDisconnect");
+        }
+      });
+
+    }
+  });
+
 
 
   socket.on("disconnect", () => {
-    if(socket.roomId){
+    if(socket.roomId && rooms.hasOwnProperty(socket.roomId)){
       if(rooms[socket.roomId].users.length == 1){
+        // make sure to clear all setIntervals and setTimeOuts
+        if(rooms[socket.roomId].timer){
+          clearInterval(rooms[socket.roomId].timer);
+        }
+        if(rooms[socket.roomId].intermissionTimer){
+          clearTimeout(rooms[socket.roomId].intermissionTimer);
+        }
+        if(rooms[socket.roomId].roundStartTimer){
+          clearTimeout(rooms[socket.roomId].roundStartTimer);
+        }
         delete rooms[socket.roomId];
+        io.socketsLeave(socket.roomId);
       }else{
+
         rooms[socket.roomId].users.splice(rooms[socket.roomId].users.indexOf(socket), 1);
         socket.to(socket.roomId).emit("userLeftMessage", socket.username);
         socket.to(socket.roomId).emit("removeUser", socket.clientId);
+
+        // if user is host
+        if(rooms[socket.roomId].host === socket){
+          io.to(socket.roomId).emit("hostLeftMessage");
+
+          // kick all the users
+          io.to(socket.roomId).emit("forceDisconnect");
+          // make sure to clear all setIntervals and setTimeOuts
+          if(rooms[socket.roomId].timer){
+            clearInterval(rooms[socket.roomId].timer);
+          }
+          if(rooms[socket.roomId].intermissionTimer){
+            clearTimeout(rooms[socket.roomId].intermissionTimer);
+          }
+          if(rooms[socket.roomId].roundStartTimer){
+            clearTimeout(rooms[socket.roomId].roundStartTimer);
+          }
+          delete rooms[socket.roomId];
+          io.socketsLeave(socket.roomId);
+          return;
+        }
+
+        // if user is drawer then end the current match
+        if(rooms[socket.roomId].drawer === socket && rooms[socket.roomId].matchInProgress){
+          socket.to(socket.roomId).emit("drawerLeftMessage");
+          
+          io.in(socket.roomId).emit("matchOver", rooms[socket.roomId].currentWord);
+          rooms[socket.roomId].nextDrawerIndex--;
+          endRound(socket);
+          clearInterval(rooms[socket.roomId].timer);
+        }
+        
+
+        socket.leave(socket.roomId);
       }
-      socket.leave(socket.roomId);
+      
     }
   });
+
+
+  }catch(e){
+    console.log(e);
+  }
 });
-
-
 
 server.listen(3000, () => {
   console.log("server started at 3000...");

@@ -56,12 +56,30 @@ socket.on("removeUser", (clientId) => {
   delete users[clientId];
 });
 
+// we can combine below five events into one singal event
+
 socket.on("userJoinedMessage", (username) => {
   addInfoChat(`${username} is joined`);
 });
 
 socket.on("userLeftMessage", (username) => {
   addInfoChat(`${username} is left`, "red");
+});
+
+socket.on("drawerLeftMessage", () => {
+  addInfoChat(`drawer is left`, "red");
+});
+
+socket.on("hostLeftMessage", () => {
+  addInfoChat(`Host is left`, "red");
+});
+
+socket.on("userKickedMessage", (username) => {
+  addInfoChat(`${username} is kicked off by Host`, "red");
+});
+
+socket.on("forceDisconnect", () => {
+  location.reload();
 });
 
 document.getElementsByClassName('roomIdBtn')[0].addEventListener('click', () => {
@@ -296,13 +314,18 @@ const addUserItem = (username, clientId) => {
     <span class="points ${clientId}">0</span>
   </div>
   
-    <img src="images/deleteIcon.svg" alt="" class="deleteIcon">
+    <img src="images/deleteIcon.svg" alt="kickPlayer" class="deleteIcon" id=${clientId} clientId=${clientId}>
   </div>`;
 
   document.getElementById("addUserBefore").insertAdjacentHTML("beforebegin", userItem);
+
+  document.getElementById(clientId).addEventListener('click', (e) => {
+    socket.emit("kickUser", e.target.attributes.clientId.value);
+  })
 }
 
 const removeUserItem = (clientId) => {
+  if(document.getElementsByClassName(clientId)[0])
   document.getElementsByClassName(clientId)[0].remove();
 }
 
