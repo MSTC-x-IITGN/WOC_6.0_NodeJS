@@ -102,6 +102,11 @@ document.getElementById("msgInput").addEventListener("submit", (e) => {
   }
 });
 
+// handle if player wants to leave
+document.getElementById("leaveBtn").addEventListener('click', () => {
+  location.reload();
+});
+
 // tell server to start game if start button was clicked by host only
 socket.on("enableStartBtn", () => {
   const startBtn = document.getElementById("startGameBtn");
