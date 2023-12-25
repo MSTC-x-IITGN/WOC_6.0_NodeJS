@@ -313,7 +313,7 @@ io.on('connection', (socket) => {
           rooms[socket.roomId].guessesCorrectly[socket.clientId] = true;
 
 
-          const score = (rooms[socket.roomId].timeRemaining / rooms[socket.roomId].timeForGuess) * 1000;
+          const score = Math.floor((rooms[socket.roomId].timeRemaining / rooms[socket.roomId].timeForGuess) * 1000);
 
           if (rooms[socket.roomId].score[socket.clientId]) {
             rooms[socket.roomId].score[socket.clientId] += score;

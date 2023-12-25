@@ -324,6 +324,8 @@ socket.on("canvasData", (data) => {
 
 socket.on("clearCanvasData", () => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = document.getElementById('stroke').value;
+  SVGTextContentElement.lineWidth = document.getElementById("lineWidth").value;
 });
 
 
